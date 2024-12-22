@@ -15,32 +15,10 @@ CanopenComponent = ns.class_(
     cg.Component,
 )
 
-PreOperationalTrigger = ns.class_("PreOperationalTrigger", automation.Trigger.template())
-OperationalTrigger = ns.class_("OperationalTrigger", automation.Trigger.template())
-HbConsumerEventTrigger = ns.class_("HbConsumerEventTrigger", automation.Trigger.template())
-CmdTriggerUInt8 = ns.class_("CmdTriggerUInt8", automation.Trigger.template())
-CmdTriggerUInt16 = ns.class_("CmdTriggerUInt16", automation.Trigger.template())
-CmdTriggerUInt32 = ns.class_("CmdTriggerUInt32", automation.Trigger.template())
-CmdTriggerInt8 = ns.class_("CmdTriggerInt8", automation.Trigger.template())
-CmdTriggerInt16 = ns.class_("CmdTriggerInt16", automation.Trigger.template())
-CmdTriggerInt32 = ns.class_("CmdTriggerInt32", automation.Trigger.template())
 
 CONF_ENTITIES = "entities"
 
 DEPENDENCIES = []
-
-CSDO_SCHEMA = cv.Schema({
-    cv.Required("node_id"): cv.int_,
-    cv.Optional("tx_id", 0x600): cv.int_,
-    cv.Optional("rx_id", 0x580): cv.int_,
-})
-
-RPDO_SCHEMA = cv.Schema({
-    cv.Required("node_id"): cv.int_,
-    cv.Required("tpdo"): cv.int_,
-    cv.Required("offset"): cv.int_,
-    cv.Optional("cmd", 0): cv.int_
-})
 
 ENTITY_SCHEMA = cv.Schema({
     cv.Required("id"): cv.use_id(cg.EntityBase),
@@ -52,33 +30,6 @@ ENTITY_SCHEMA = cv.Schema({
     cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
 
-def template_entity_cmd_schema(type, trigger):
-    return cv.Schema({
-        cv.Required("type"): type,
-        cv.Required("handler"):
-            automation.validate_automation({
-                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(trigger),
-            }),
-    })
-
-TEMPLATE_ENTITY_METADATA_SCHEMA = cv.Schema({
-    cv.Required("type"): cv.int_,
-    cv.Optional("name", ""): cv.string,
-    cv.Optional("device_class", ""): cv.string,
-    cv.Optional("unit", ""): cv.string,
-    cv.Optional("state_class", ""): cv.string,
-})
-
-TEMPLATE_ENTITY_STATE_SCHEMA = cv.Schema({
-    cv.Required("type"): cv.string,
-})
-
-TEMPLATE_ENTITY_CMD_SCHEMA = cv.vol.Union(
-    template_entity_cmd_schema("uint8", CmdTriggerUInt8),
-    template_entity_cmd_schema("uint16", CmdTriggerUInt16),
-    template_entity_cmd_schema("uint32", CmdTriggerUInt32),
-    discriminant=lambda val, alt: filter(lambda x: x.schema['type'] == val['type'], alt)
-)
 
 TEMPLATE_ENTITY = cv.Schema({
     cv.Required("index"): cv.int_,
@@ -88,10 +39,6 @@ TEMPLATE_ENTITY = cv.Schema({
     cv.Optional("metadata"): TEMPLATE_ENTITY_METADATA_SCHEMA,
 })
 
-HB_CLIENT_SCHEMA = cv.Schema({
-    cv.Required("node_id"): cv.int_,
-    cv.Required("timeout"): cv.positive_time_period_milliseconds,
-})
 
 CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
@@ -103,45 +50,11 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
     cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
     cv.Optional("template_entities"): cv.ensure_list(TEMPLATE_ENTITY),
-    cv.Optional("on_pre_operational"): automation.validate_automation({
-        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(PreOperationalTrigger),
-    }),
-    cv.Optional("on_operational"): automation.validate_automation({
-        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(OperationalTrigger),
-    }),
-    cv.Optional("on_hb_consumer_event"): automation.validate_automation({
-        cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(HbConsumerEventTrigger),
-    }),
-    cv.Optional("state_update_delay", "100ms"): cv.positive_time_period_microseconds,
-    cv.Optional("heartbeat_interval", "5000ms"): cv.positive_time_period_milliseconds,
-    cv.Optional("heartbeat_clients"): cv.ensure_list(HB_CLIENT_SCHEMA),
-    cv.Optional("sw_version"): cv.string,
-    cv.Optional("hw_version"): cv.string
 }).extend(cv.COMPONENT_SCHEMA)
 
-TYPE_TO_CANOPEN_TYPE = {
-    "uint8": (cg.RawExpression("CO_TUNSIGNED8"), 1),
-    "uint16": (cg.RawExpression("CO_TUNSIGNED16"), 2),
-    "uint32": (cg.RawExpression("CO_TUNSIGNED32"), 4),
-    "int8": (cg.RawExpression("CO_TSIGNED8"), 1),
-    "int16": (cg.RawExpression("CO_TSIGNED16"), 2),
-    "int32": (cg.RawExpression("CO_TSIGNED32"), 4),
-}
 
 def to_code(config):
-    cg.add_platformio_option("build_flags", [
-        "-DCO_SSDO_N=1",
-        "-DCO_CSDO_N=1",
-        "-DCO_RPDO_N=4",
-        "-DCO_TPDO_N=8",
-        "-DUSE_LSS=0",
-        "-DUSE_CSDO=0",
-        "-DMINIZ_NO_STDIO=1",
-    ])
 
-    cg.add_library("canopenstack=https://github.com/mrk-its/canopen-stack#test", None)
-    cg.add_library("micro_miniz=https://github.com/rzeldent/micro-miniz#main", None)
-    # cg.add_library("canopenstack=file:///home/mrk/canopen-stack", "0.0.0")
     node_id = config["node_id"]
     canopen = cg.new_Pvariable(config[CONF_ID], node_id)
 
@@ -149,26 +62,6 @@ def to_code(config):
         cg.add_define("USE_CANBUS")
         canbus = yield cg.get_variable(config["canbus_id"])
         cg.add(canopen.set_canbus(canbus))
-
-    if "mqtt_id" in config:
-        mqtt_client = yield cg.get_variable(config["mqtt_id"])
-        cg.add(canopen.set_mqtt_client(mqtt_client))
-
-    cg.add(canopen.set_state_update_delay(config["state_update_delay"]))
-    cg.add(canopen.set_heartbeat_interval(config["heartbeat_interval"]))
-    hw_version = config.get("hw_version")
-    sw_version = config.get("sw_version")
-
-    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d.%H%M%S")
-
-    cg.add(cg.RawStatement(f"""const char * version_str = "node_id: {node_id:02x}, ver: " ESPHOME_VERSION ".{ts}";"""))
-
-    sw_version = 'version_str + 18'
-
-    if hw_version:
-        cg.add(canopen.od_set_string(0x1009, 0, hw_version))
-    if sw_version:
-        cg.add(canopen.od_set_string(0x100a, 0, cg.RawExpression(sw_version)))
 
     yield cg.register_component(canopen, config)
 
