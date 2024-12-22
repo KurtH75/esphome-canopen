@@ -27,7 +27,6 @@ ENTITY_SCHEMA = cv.Schema({
     cv.Optional("min_value"): cv.float_,
     cv.Optional("max_value"): cv.float_,
     cv.Optional("tpdo"): cv.int_,
-    cv.Optional("rpdo"): cv.ensure_list(RPDO_SCHEMA),
 })
 
 
@@ -78,25 +77,4 @@ def to_code(config):
         else:
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
 
-    
 
-
-    rpdo_entities = [
-        {**rpdo, "entity_index": entity["index"]}
-        for entity in entities
-        for rpdo in entity.get("rpdo", ())
-    ]
-    rpdo_entities.sort(key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"], rpdo["offset"]))
-    for idx, ((node_id, tpdo), rpdos) in enumerate(
-        groupby(rpdo_entities, key=lambda rpdo: (rpdo["node_id"], rpdo["tpdo"]))
-    ):
-        cg.add(canopen.add_rpdo_node(idx, node_id, tpdo))
-        rpdos = list(rpdos)
-        curr_offs = 0
-        for rpdo in rpdos:
-            assert rpdo["offset"] >= curr_offs, f"RPDO: invalid TPDO offset {rpdo}"
-            if rpdo["offset"] > curr_offs:
-                cg.add(canopen.add_rpdo_dummy(idx, rpdo["offset"] - curr_offs))
-                curr_offs = rpdo["offset"]
-            cg.add(canopen.add_rpdo_entity_cmd(idx, rpdo["entity_index"], rpdo["cmd"]))
-            curr_offs += 1
