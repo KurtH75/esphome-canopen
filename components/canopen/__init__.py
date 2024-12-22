@@ -78,40 +78,7 @@ def to_code(config):
         else:
             cg.add(canopen.add_entity(entity, entity_config["index"], tpdo))
 
-    for tmpl_entity in config.get("template_entities", []):
-        index = tmpl_entity["index"]
-        metadata = tmpl_entity.get("metadata")
-        if metadata:
-            cg.add(canopen.od_add_metadata(index, metadata["type"], metadata["name"], metadata["device_class"], metadata["unit"], metadata["state_class"]))
-        for state in tmpl_entity.get("states", ()):
-            _type, size = TYPE_TO_CANOPEN_TYPE[state["type"]]
-            cg.add(canopen.od_add_state(index, _type, 0, size, tmpl_entity["tpdo"]))
-            pass
-        for cmd in tmpl_entity.get("commands", ()):
-            for handler in cmd["handler"]:
-                trigger = cg.new_Pvariable(handler[CONF_TRIGGER_ID])
-                yield automation.build_automation(trigger, [(getattr(cg, cmd["type"]), "x"),], handler)
-                cg.add(canopen.add_entity_cmd(index, tmpl_entity.get("tpdo", -1), trigger))
-
-    for num, csdo in enumerate(config.get("csdo", ())):
-        cg.add(canopen.setup_csdo(num, csdo["node_id"], csdo["tx_id"], csdo["rx_id"]))
-    for num, client in enumerate(config.get("heartbeat_clients", ()), 1):
-        cg.add(canopen.setup_heartbeat_client(num, client["node_id"], client["timeout"]))
-
-    for conf in config.get("on_operational", []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
-        yield automation.build_automation(trigger, [], conf)
-        cg.add(canopen.add_trigger(trigger))
-
-    for conf in config.get("on_pre_operational", []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
-        yield automation.build_automation(trigger, [], conf)
-        cg.add(canopen.add_trigger(trigger))
-
-    for conf in config.get("on_hb_consumer_event", []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID])
-        yield automation.build_automation(trigger, [(cg.uint8, "node_id"),], conf)
-        cg.add(canopen.add_trigger(trigger))
+    
 
 
     rpdo_entities = [
