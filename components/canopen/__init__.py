@@ -33,9 +33,7 @@ ENTITY_SCHEMA = cv.Schema({
 TEMPLATE_ENTITY = cv.Schema({
     cv.Required("index"): cv.int_,
     cv.Optional("tpdo", -1): cv.int_,
-    cv.Optional("commands"): cv.ensure_list(TEMPLATE_ENTITY_CMD_SCHEMA),
-    cv.Optional("states"): cv.ensure_list(TEMPLATE_ENTITY_STATE_SCHEMA),
-    cv.Optional("metadata"): TEMPLATE_ENTITY_METADATA_SCHEMA,
+   
 })
 
 
@@ -43,10 +41,8 @@ CONFIG_SCHEMA = cv.Schema({
     cv.GenerateID(): cv.declare_id(CanopenComponent),
     cv.Optional("canbus_id"): cv.use_id(CanbusComponent),
     # cv.GenerateID("ota_id"): cv.use_id(CanopenOTAComponent),
-    cv.Optional("mqtt_id"): cv.use_id(MQTTClientComponent),
     cv.Required("node_id"): cv.int_,
     # cv.Optional("status"): STATUS_ENTITY_SCHEMA,
-    cv.Optional("csdo"): cv.ensure_list(CSDO_SCHEMA),
     cv.Required(CONF_ENTITIES): cv.ensure_list(ENTITY_SCHEMA),
     cv.Optional("template_entities"): cv.ensure_list(TEMPLATE_ENTITY),
 }).extend(cv.COMPONENT_SCHEMA)
